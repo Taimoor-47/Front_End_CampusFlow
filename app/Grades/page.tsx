@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Printer, Download, GraduationCap, TrendingUp, BookOpen, Award } from 'lucide-react';
+import { Printer, GraduationCap, TrendingUp, BookOpen, Award } from 'lucide-react';
 import Sidebar from '../components/navbar/Navbar';
 import { getMyGradeCard } from '../../services/studentService';
 import type { GradeCard, SemesterResult, CourseGrade } from '../../types/api';
@@ -345,6 +345,8 @@ export default function GradesPage() {
     let parsed: { name: string; role: string };
     try { parsed = JSON.parse(stored); } catch { router.push('/LoginPage'); return; }
     if (parsed.role !== 'Student') { router.push('/teacherDashboard'); return; }
+    // sessionStorage is an external browser store restored after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUser(parsed);
 
     // ── Try the real API first; fall back to mock data ──────────────────────
@@ -352,9 +354,14 @@ export default function GradesPage() {
     // use real data. Until then the mock keeps the UI working.
     getMyGradeCard()
       .then(setCard)
-      .catch(() => {
+      .catch((err: unknown) => {
         // API not yet built — use mock data so you can develop the UI now
         setCard(MOCK_GRADE_CARD);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Live grade card is not available yet; showing demo data.'
+        );
       })
       .finally(() => setLoading(false));
   }, [router]);

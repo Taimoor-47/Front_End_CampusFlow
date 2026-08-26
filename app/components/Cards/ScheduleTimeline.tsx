@@ -14,7 +14,7 @@ function fmt(t: string) {
 export default function ScheduleTimeline({ entries }: Props) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <h2 className="text-sm font-medium text-gray-900 mb-3">Today's Schedule</h2>
+      <h2 className="text-sm font-medium text-gray-900 mb-3">Today&apos;s Schedule</h2>
 
       {entries.length === 0 ? (
         <p className="text-sm text-gray-500 py-4 text-center">No classes today</p>
