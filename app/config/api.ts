@@ -5,8 +5,21 @@ export const API_BASE_URL =
 
 const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/i, "");
 
-/** Convert an API file path such as /uploads/... into a browser-safe URL. */
+/**
+ * Convert a stored file path into a browser URL.
+ *
+ * Uploads are no longer publicly served: `/uploads/{kind}/{file}` maps to the
+ * authorization-checked `GET /api/files/{kind}/{file}` endpoint, which streams
+ * the file only to permitted users (the JWT cookie rides along automatically).
+ */
 export function getApiFileUrl(filePath: string): string {
   if (/^https?:\/\//i.test(filePath)) return filePath;
-  return `${API_ORIGIN}/${filePath.replace(/^\/+/, "")}`;
+
+  const normalized = filePath.replace(/^\/+/, "");
+  if (normalized.startsWith("uploads/")) {
+    return `${API_BASE_URL}/files/${normalized.slice("uploads/".length)}`;
+  }
+
+  // Fallback for any non-upload asset path.
+  return `${API_ORIGIN}/${normalized}`;
 }
