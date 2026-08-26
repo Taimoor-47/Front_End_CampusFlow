@@ -32,12 +32,19 @@ export interface SemesterGpa {
 
 export interface UpcomingAssignment {
   assignmentId: string
+  courseSectionId: string
   courseCode: string
   courseTitle: string
+  sectionName: string
   title: string
+  description: string
   dueDate: string                            // ISO 8601
   urgencyLabel: 'Urgent' | 'Soon' | 'Ok'
+  isPastDue: boolean
+  filePath: string | null
   isSubmitted: boolean
+  submissionFilePath: string | null
+  submittedAt: string | null
 }
 
 // ── Schedule ──────────────────────────────────────────────────────────────────

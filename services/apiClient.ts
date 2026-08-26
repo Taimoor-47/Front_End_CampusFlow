@@ -94,17 +94,27 @@ export async function apiClient<T>(
   let response: Response;
 
   try {
+    const headers = new Headers(options?.headers);
+
+    const isFormData =
+      typeof FormData !== "undefined" && options?.body instanceof FormData;
+
+    // JSON requests require this header. FormData requests must let the
+    // browser generate the multipart boundary.
+    if (!isFormData && options?.body && !headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+
     response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      credentials: "include",          // ← send the JWT cookie automatically
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
       ...options,
+      credentials: "include",
+      headers,
     });
   } catch (cause) {
     if (process.env.NODE_ENV === "development") {
-      console.error(`[apiClient] ${endpoint} could not reach the API`, cause);
+      // Next.js turns console.error calls into a development error overlay.
+      // Network failures are already converted into a safe ApiError below.
+      console.warn(`[apiClient] ${endpoint} could not reach the API`, cause);
     }
 
     throw new ApiError(
@@ -119,10 +129,11 @@ export async function apiClient<T>(
     if (process.env.NODE_ENV === "development") {
       // Keep diagnostics out of the rendered UI and never log response bodies,
       // because ASP.NET exception pages can contain cookies and other secrets.
-      console.error(`[apiClient] ${endpoint} failed`, {
-        status: response.status,
-        statusText: response.statusText,
-      });
+      // Log a primitive string instead of an object so browser/Next.js consoles
+      // display the useful status without presenting an error overlay.
+      console.warn(
+        `[apiClient] ${endpoint} failed with HTTP ${response.status} ${response.statusText}`
+      );
     }
 
     throw new ApiError(
