@@ -18,7 +18,7 @@ import CgpaChart from '../components/Cards/GPACard';
 import ScheduleTimeline from '../components/Cards/ScheduleTimeline';
 import AssignmentsCard from '../components/Cards/Assignments';
 import { getMyGpa, getMySchedules, getMyAssignments } from '../../services/studentService';
-import type { GpaRecord, ScheduleRecord, AssignmentRecord, SubmissionResponse } from '../../services/studentService';
+import type { GpaRecord, ScheduleRecord, AssignmentRecord } from '../../services/studentService';
 import type { SemesterGpa, ScheduleEntry, UpcomingAssignment } from '../../types/api';
 
 type User = { name: string; email: string; role: string };
@@ -54,19 +54,12 @@ function toUpcomingAssignment(a: AssignmentRecord): UpcomingAssignment {
     daysLeft <= 2 ? 'Urgent' : daysLeft <= 7 ? 'Soon' : 'Ok';
   return {
     assignmentId: a.id,
-    courseSectionId: a.courseSectionId,
-    courseCode: a.courseCode,
-    courseTitle: a.courseTitle,
-    sectionName: a.sectionName,
+    courseCode: '',
+    courseTitle: '',
     title: a.title,
-    description: a.description,
     dueDate: a.dueDate,
     urgencyLabel,
-    isPastDue: msLeft < 0,
-    filePath: a.filePath,
-    isSubmitted: a.submitted,
-    submissionFilePath: a.submissionFilePath,
-    submittedAt: a.submittedAt,
+    isSubmitted: false,
   };
 }
 
@@ -89,8 +82,6 @@ export default function DashboardPage() {
     let parsed: User;
     try { parsed = JSON.parse(stored); } catch { router.push('/LoginPage'); return; }
     if (parsed.role !== 'Student') { router.push('/teacherDashboard'); return; }
-    // sessionStorage is an external browser store restored after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUser(parsed);
 
     // Fetch all three APIs at the same time (parallel, not sequential)
@@ -110,22 +101,6 @@ export default function DashboardPage() {
     </div>
   );
   if (!user) return null;
-
-  const handleAssignmentSubmitted = (
-    assignmentId: string,
-    submission: SubmissionResponse
-  ) => {
-    setAssignments(current => current.map(assignment =>
-      assignment.assignmentId === assignmentId
-        ? {
-            ...assignment,
-            isSubmitted: true,
-            submissionFilePath: submission.filePath,
-            submittedAt: submission.submittedAt,
-          }
-        : assignment
-    ));
-  };
 
   return (
     <div className="flex min-h-screen bg-slate-100">
@@ -152,10 +127,7 @@ export default function DashboardPage() {
                 No GPA records yet
               </div>
             )}
-            <AssignmentsCard
-              assignments={assignments}
-              onSubmitted={handleAssignmentSubmitted}
-            />
+            <AssignmentsCard assignments={assignments} />
           </section>
           <aside>
             <ScheduleTimeline entries={schedules} />

@@ -29,24 +29,10 @@ export interface ScheduleRecord {
 
 export interface AssignmentRecord {
   id: string;
-  courseSectionId: string;
-  courseCode: string;
-  courseTitle: string;
-  sectionName: string;
   title: string;
   description: string;
   dueDate: string;     // ISO 8601 e.g. "2026-06-15T00:00:00"
-  filePath: string | null;
-  submitted: boolean;
-  submissionFilePath: string | null;
-  submittedAt: string | null;
-}
-
-export interface SubmissionResponse {
-  id: string;
-  assignmentId: string;
-  filePath: string;
-  submittedAt: string;
+  studentId: string;
 }
 
 // ── API calls ────────────────────────────────────────────────────────────────
@@ -68,23 +54,6 @@ export async function getMySchedules(): Promise<ScheduleRecord[]> {
 export async function getMyAssignments(): Promise<AssignmentRecord[]> {
   // GET /api/student/my-assignments
   return apiClient<AssignmentRecord[]>("/student/my-assignments");
-}
-
-/** Submit a file for an assignment visible to the logged-in student. */
-export async function submitAssignment(
-  assignmentId: string,
-  file: File
-): Promise<SubmissionResponse> {
-  const formData = new FormData();
-  formData.append("file", file);
-
-  return apiClient<SubmissionResponse>(
-    `/student/assignments/${assignmentId}/submit`,
-    {
-      method: "POST",
-      body: formData,
-    }
-  );
 }
 
 /** Fetch the full grade card (all semesters + subjects) for the logged-in student. */

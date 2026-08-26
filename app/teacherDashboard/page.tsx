@@ -7,30 +7,17 @@
  *   1. See a list of all registered students
  *   2. Add a GPA record for any student
  *   3. Add a class schedule for any student
- *   4. Add an assignment for an assigned course section
+ *   4. Add an assignment for any student
  *
  * The page is split into tabs so everything lives in one place.
  * Each form sends data to the backend using teacherService functions.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '../components/navbar/Navbar';
-import {
-  getAllStudents,
-  getMySections,
-  getAssignmentSubmissions,
-  addGpa,
-  addSchedule,
-  addAssignment,
-} from '../../services/teacherService';
-import type {
-  AssignmentCreateResponse,
-  CourseSectionOption,
-  Student,
-  TeacherSubmission,
-} from '../../services/teacherService';
-import { getApiFileUrl } from '../config/api';
+import {getAllStudents, addGpa, addSchedule, addAssignment,} from '../../services/teacherService';
+import type { Student } from '../../services/teacherService';
 
 type User = { name: string; email: string; role: string };
 type Tab = 'students' | 'gpa' | 'schedule' | 'assignment';
@@ -49,8 +36,6 @@ export default function TeacherDashboard() {
     let parsed: User;
     try { parsed = JSON.parse(stored); } catch { router.push('/LoginPage'); return; }
     if (parsed.role !== 'Teacher') { router.push('/StudentDashboard'); return; }
-    // sessionStorage is an external browser store restored after hydration.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUser(parsed);
 
     getAllStudents()
@@ -108,7 +93,7 @@ export default function TeacherDashboard() {
           <AddScheduleTab students={students} />
         )}
         {tab === 'assignment' && (
-          <AddAssignmentTab />
+          <AddAssignmentTab students={students} />
         )}
       </main>
     </div>
@@ -240,66 +225,27 @@ function AddScheduleTab({ students }: { students: Student[] }) {
 
 // ── Add Assignment tab ────────────────────────────────────────────────────────
 
-const MAX_ASSIGNMENT_FILE_BYTES = 25 * 1024 * 1024;
-const ASSIGNMENT_FILE_TYPES = '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.png,.jpg,.jpeg';
-
-function AddAssignmentTab() {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [sections, setSections] = useState<CourseSectionOption[]>([]);
-  const [loadingSections, setLoadingSections] = useState(true);
-  const [courseSectionId, setCourseSectionId] = useState('');
+function AddAssignmentTab({ students }: { students: Student[] }) {
+  const [studentId, setStudentId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [createdAssignment, setCreatedAssignment] = useState<AssignmentCreateResponse | null>(null);
-  const [submissions, setSubmissions] = useState<TeacherSubmission[]>([]);
-  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
   const [status, setStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    getMySections()
-      .then(setSections)
-      .catch(err => setStatus({
-        ok: false,
-        msg: err instanceof Error ? err.message : 'Failed to load course sections.',
-      }))
-      .finally(() => setLoadingSections(false));
-  }, []);
-
-  const handleFileChange = (selected: File | null) => {
-    setStatus(null);
-    if (selected && selected.size > MAX_ASSIGNMENT_FILE_BYTES) {
-      setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      setStatus({ ok: false, msg: 'The attachment must be 25 MB or smaller.' });
-      return;
-    }
-    setFile(selected);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus(null);
-    if (!courseSectionId) {
-      setStatus({ ok: false, msg: 'Select a course section.' });
-      return;
-    }
     setLoading(true);
     try {
-      const created = await addAssignment({
-        courseSectionId,
+      await addAssignment({
+        studentId,
         title,
         description,
         dueDate: new Date(dueDate).toISOString(),
-        file,
       });
-      setCreatedAssignment(created);
-      setSubmissions([]);
-      setStatus({ ok: true, msg: 'Assignment published to the selected section.' });
-      setTitle(''); setDescription(''); setDueDate(''); setFile(null);
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      setStatus({ ok: true, msg: 'Assignment created successfully!' });
+      setTitle(''); setDescription(''); setDueDate('');
     } catch (err) {
       setStatus({ ok: false, msg: err instanceof Error ? err.message : 'Failed.' });
     } finally {
@@ -307,49 +253,10 @@ function AddAssignmentTab() {
     }
   };
 
-  const refreshSubmissions = async () => {
-    if (!createdAssignment) return;
-    setLoadingSubmissions(true);
-    setStatus(null);
-    try {
-      setSubmissions(await getAssignmentSubmissions(createdAssignment.id));
-    } catch (err) {
-      setStatus({
-        ok: false,
-        msg: err instanceof Error ? err.message : 'Failed to load submissions.',
-      });
-    } finally {
-      setLoadingSubmissions(false);
-    }
-  };
-
   return (
-    <FormCard title="Create Section Assignment">
+    <FormCard title="Create Assignment">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Course section</label>
-          <select
-            required
-            value={courseSectionId}
-            onChange={e => setCourseSectionId(e.target.value)}
-            disabled={loadingSections || sections.length === 0}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-          >
-            <option value="">
-              {loadingSections ? 'Loading sections…' : '— Select a course section —'}
-            </option>
-            {sections.map(section => (
-              <option key={section.id} value={section.id}>
-                {section.courseCode} — {section.courseTitle} · {section.sectionName} · Semester {section.semester} ({section.academicYear})
-              </option>
-            ))}
-          </select>
-          {!loadingSections && sections.length === 0 && (
-            <p className="text-xs text-amber-700">
-              No course sections are assigned to your teacher account.
-            </p>
-          )}
-        </div>
+        <StudentSelect students={students} value={studentId} onChange={setStudentId} />
         <FormInput label="Title" type="text" placeholder="e.g. Chapter 5 Exercise" value={title} onChange={setTitle} />
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700">Description</label>
@@ -360,66 +267,9 @@ function AddAssignmentTab() {
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none resize-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
-        <FormInput label="Due date and time" type="datetime-local" value={dueDate} onChange={setDueDate} />
-        <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Assignment brief (optional)</label>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ASSIGNMENT_FILE_TYPES}
-            onChange={e => handleFileChange(e.target.files?.[0] ?? null)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-blue-700"
-          />
-          <p className="text-xs text-gray-500">Allowed document, archive, and image files; maximum 25 MB.</p>
-        </div>
+        <FormInput label="Due Date" type="date" value={dueDate} onChange={setDueDate} />
         <StatusMessage status={status} />
-        <SubmitButton
-          loading={loading}
-          disabled={loadingSections || sections.length === 0}
-          label="Publish Assignment"
-        />
-        {createdAssignment && (
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium text-gray-800">Submissions: {createdAssignment.title}</p>
-                <p className="text-xs text-gray-500">
-                  {createdAssignment.courseCode} · Section {createdAssignment.sectionName}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={refreshSubmissions}
-                disabled={loadingSubmissions}
-                className="rounded-md border border-blue-200 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-              >
-                {loadingSubmissions ? 'Refreshing…' : 'Refresh submissions'}
-              </button>
-            </div>
-            {!loadingSubmissions && submissions.length === 0 ? (
-              <p className="mt-3 text-xs text-gray-500">No submissions received yet.</p>
-            ) : (
-              <ul className="mt-3 divide-y divide-gray-200">
-                {submissions.map(submission => (
-                  <li key={submission.id} className="flex items-center justify-between gap-3 py-2 text-xs">
-                    <div>
-                      <p className="font-medium text-gray-700">{submission.studentName ?? 'Student'}</p>
-                      <p className="text-gray-500">{new Date(submission.submittedAt).toLocaleString()}</p>
-                    </div>
-                    <a
-                      href={getApiFileUrl(submission.filePath)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-medium text-blue-600 hover:underline"
-                    >
-                      Open file
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+        <SubmitButton loading={loading} label="Create Assignment" />
       </form>
     </FormCard>
   );
@@ -494,17 +344,9 @@ function StatusMessage({ status }: { status: { ok: boolean; msg: string } | null
   );
 }
 
-function SubmitButton({
-  loading,
-  label,
-  disabled = false,
-}: {
-  loading: boolean;
-  label: string;
-  disabled?: boolean;
-}) {
+function SubmitButton({ loading, label }: { loading: boolean; label: string }) {
   return (
-    <button type="submit" disabled={loading || disabled}
+    <button type="submit" disabled={loading}
       className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium text-sm
         hover:bg-blue-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
     >
