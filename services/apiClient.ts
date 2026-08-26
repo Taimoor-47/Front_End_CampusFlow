@@ -38,7 +38,8 @@ async function getPublicErrorMessage(response: Response): Promise<string | null>
 
       if (typeof payload === "object" && payload !== null) {
         const error = payload as Record<string, unknown>;
-        const candidates = [error.message, error.title];
+        // RFC 7807 ProblemDetails puts the most specific safe text in "detail".
+        const candidates = [error.detail, error.message, error.title];
         return candidates.find(isSafePublicMessage) ?? null;
       }
 

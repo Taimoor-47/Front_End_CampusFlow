@@ -41,6 +41,7 @@ function validateField(name: keyof LoginForm, value: string): string {
     case 'email':
       if (!value.trim()) return 'Email is required.';
       if (!EMAIL_REGEX.test(value)) return 'Enter a valid email address.';
+      if (/[A-Z]/.test(value.trim())) return 'Email must be in lowercase letters.';
       return '';
     case 'password':
       if (!value) return 'Password is required.';
