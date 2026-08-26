@@ -17,8 +17,9 @@ import Sidebar from '../components/navbar/Navbar';
 import CgpaChart from '../components/Cards/GPACard';
 import ScheduleTimeline from '../components/Cards/ScheduleTimeline';
 import AssignmentsCard from '../components/Cards/Assignments';
-import { getMyGpa, getMySchedules, getMyAssignments } from '../../services/studentService';
+import { getMyGpa, getMySchedules, getMyAssignments, getCurrentStudent } from '../../services/studentService';
 import type { GpaRecord, ScheduleRecord, AssignmentRecord, SubmissionResponse } from '../../services/studentService';
+import { ApiError } from '../../services/apiClient';
 import type { SemesterGpa, ScheduleEntry, UpcomingAssignment } from '../../types/api';
 
 type User = { name: string; email: string; role: string };
@@ -93,14 +94,23 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUser(parsed);
 
-    // Fetch all three APIs at the same time (parallel, not sequential)
-    Promise.all([getMyGpa(), getMySchedules(), getMyAssignments()])
+    // Verify the cookie-backed session with the server first; a 401 here means
+    // the JWT is missing or expired regardless of what sessionStorage claims.
+    getCurrentStudent()
+      .then(() => Promise.all([getMyGpa(), getMySchedules(), getMyAssignments()]))
       .then(([gpa, sch, asgn]) => {
         setGpaHistory(gpa.map((g: GpaRecord) => ({ semester: g.semester, gpa: g.gpa })));
         setSchedules(sch.map(toScheduleEntry));
         setAssignments(asgn.map(toUpcomingAssignment));
       })
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load data.'))
+      .catch(err => {
+        if (err instanceof ApiError && err.status === 401) {
+          sessionStorage.removeItem('user');
+          router.push('/LoginPage');
+          return;
+        }
+        setError(err instanceof Error ? err.message : 'Failed to load data.');
+      })
       .finally(() => setIsLoading(false));
   }, [router]);
 

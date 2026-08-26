@@ -130,3 +130,19 @@ export async function getAssignmentSubmissions(
     `/teacher/assignments/${assignmentId}/submissions`
   );
 }
+
+// ── Session verification ─────────────────────────────────────────────────────
+
+export interface CurrentTeacher {
+  teacherId: string;
+  email: string;
+}
+
+/**
+ * Server-verified identity of the signed-in teacher.
+ * Fails with ApiError(401) when the JWT cookie is missing/expired.
+ */
+export async function getCurrentTeacher(): Promise<CurrentTeacher> {
+  // GET /api/teacher/me
+  return apiClient<CurrentTeacher>("/teacher/me");
+}

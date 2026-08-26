@@ -20,6 +20,7 @@ import {
   getAllStudents,
   getMySections,
   getAssignmentSubmissions,
+  getCurrentTeacher,
   addGpa,
   addSchedule,
   addAssignment,
@@ -30,6 +31,7 @@ import type {
   Student,
   TeacherSubmission,
 } from '../../services/teacherService';
+import { ApiError } from '../../services/apiClient';
 import { getApiFileUrl } from '../config/api';
 
 type User = { name: string; email: string; role: string };
@@ -53,9 +55,19 @@ export default function TeacherDashboard() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUser(parsed);
 
-    getAllStudents()
+    // Verify the cookie-backed session with the server first; a 401 here means
+    // the JWT is missing or expired regardless of what sessionStorage claims.
+    getCurrentTeacher()
+      .then(() => getAllStudents())
       .then(setStudents)
-      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load students.'))
+      .catch(err => {
+        if (err instanceof ApiError && err.status === 401) {
+          sessionStorage.removeItem('user');
+          router.push('/LoginPage');
+          return;
+        }
+        setError(err instanceof Error ? err.message : 'Failed to load students.')
+      })
       .finally(() => setLoadingStudents(false));
   }, [router]);
 

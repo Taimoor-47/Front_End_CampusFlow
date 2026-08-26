@@ -93,3 +93,20 @@ export async function getMyGradeCard(): Promise<GradeCard> {
   // NOTE: This endpoint needs to be created in the backend — see the guide below.
   return apiClient<GradeCard>("/student/grade-card");
 }
+
+// ── Session verification ─────────────────────────────────────────────────────
+
+export interface CurrentStudent {
+  studentId: string;
+  email: string;
+}
+
+/**
+ * Server-verified identity of the signed-in student.
+ * Fails with ApiError(401) when the JWT cookie is missing/expired — used by
+ * dashboards to validate the session instead of trusting sessionStorage.
+ */
+export async function getCurrentStudent(): Promise<CurrentStudent> {
+  // GET /api/student/me
+  return apiClient<CurrentStudent>("/student/me");
+}
