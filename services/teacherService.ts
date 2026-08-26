@@ -16,7 +16,6 @@ export interface Student {
   phoneNumber: string;
   age: number;
   isActive: boolean;
-  role: string;
 }
 
 export interface AddGpaRequest {
@@ -33,19 +32,55 @@ export interface AddScheduleRequest {
   endTime: string;     // "HH:mm:ss"
 }
 
+export interface CourseSectionOption {
+  id: string;
+  courseCode: string;
+  courseTitle: string;
+  sectionName: string;
+  academicYear: string;
+  semester: number;
+}
+
 export interface AddAssignmentRequest {
-  studentId: string;
+  courseSectionId: string;
   title: string;
   description: string;
-  dueDate: string;     // ISO 8601
+  dueDate: string;
+  file?: File | null;
+}
+
+export interface AssignmentCreateResponse {
+  id: string;
+  courseSectionId: string;
+  courseCode: string;
+  courseTitle: string;
+  sectionName: string;
+  title: string;
+  description: string;
+  dueDate: string;
+  filePath: string | null;
+}
+
+export interface TeacherSubmission {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  studentName: string | null;
+  filePath: string;
+  submittedAt: string;
 }
 
 // ── API calls ────────────────────────────────────────────────────────────────
 
-/** Get every student with their GPA, schedules, and assignments. */
+/** Get safe student summaries available to the teacher. */
 export async function getAllStudents(): Promise<Student[]> {
   // GET /api/teacher/students
   return apiClient<Student[]>("/teacher/students");
+}
+
+/** Get only the course sections assigned to the logged-in teacher. */
+export async function getMySections(): Promise<CourseSectionOption[]> {
+  return apiClient<CourseSectionOption[]>("/teacher/sections");
 }
 
 /** Add a GPA record for a student. */
@@ -66,11 +101,32 @@ export async function addSchedule(data: AddScheduleRequest): Promise<unknown> {
   });
 }
 
-/** Create an assignment for a student. */
-export async function addAssignment(data: AddAssignmentRequest): Promise<unknown> {
-  // POST /api/teacher/add-assignment
-  return apiClient("/teacher/add-assignment", {
+/** Create an assignment for every actively enrolled student in a course section. */
+export async function addAssignment(
+  data: AddAssignmentRequest
+): Promise<AssignmentCreateResponse> {
+  const formData = new FormData();
+
+  formData.append("courseSectionId", data.courseSectionId);
+  formData.append("title", data.title);
+  formData.append("description", data.description);
+  formData.append("dueDate", data.dueDate);
+
+  if (data.file) {
+    formData.append("file", data.file);
+  }
+
+  return apiClient<AssignmentCreateResponse>("/teacher/assignments", {
     method: "POST",
-    body: JSON.stringify(data),
+    body: formData,
   });
+}
+
+/** Get submissions after backend ownership-checks the assignment against the JWT teacher. */
+export async function getAssignmentSubmissions(
+  assignmentId: string
+): Promise<TeacherSubmission[]> {
+  return apiClient<TeacherSubmission[]>(
+    `/teacher/assignments/${assignmentId}/submissions`
+  );
 }
